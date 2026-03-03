@@ -1,15 +1,10 @@
-import InterviewSession from "../models/interviewSession.model.js";
+import { createInterviewSessionService } from "../services/interview.service.js";
 import asyncHandler from "../utils/async-handler.js";
 
 const createSession = asyncHandler (async(req, res) => {
     const {jobRole} = req.body
 
-    const session = await InterviewSession.create({
-        jobRole,
-        questions:[],
-        answers:[],
-        scores:[]
-    })
+    const session = await createInterviewSessionService(jobRole)
 
     res.status(201).json({
         success:true,
