@@ -41,7 +41,7 @@ export const generateQuestionsFromAI = async (jobRole)=>{
     return response.choices[0].message.content.trim()
 }
 
-export const continueInterviewWithAI = async (conversation, jobRole) => {
+export const continueInterviewWithAI = async (conversation, jobRole, difficultyLevel) => {
     if(!process.env.OPENAI_API_KEY){
         throw new Error("OPENAI_API_KEY not found in environment variables")
     }
@@ -54,29 +54,42 @@ export const continueInterviewWithAI = async (conversation, jobRole) => {
     const systemPrompt = `
 You are a senior FAANG-level technical interviewer.
 
-You are conducting a mock technical interview for the role: ${jobRole}.
+You are conducting a mock interview for the role: ${jobRole}.
+
+Current interview stage: ${difficultyLevel}
+
+Difficulty guidelines:
+
+warmup:
+- basic conceptual questions
+- simple understanding checks
+
+core:
+- practical engineering questions
+- real-world scenarios
+
+advanced:
+- deeper technical questions
+- debugging and architecture reasoning
+
+challenge:
+- complex algorithmic or system design problems
 
 When the candidate answers a question you must:
 
-1. Evaluate the answer
-2. Decide how strong the answer is
+1. Evaluate the candidate answer
+2. Give a short evaluation
 3. Ask the next question
 
-Return ONLY valid JSON in this format:
+Return ONLY valid JSON:
 
 {
-  "score": number (0-10),
-  "evaluation": "short evaluation of the candidate answer",
+  "score": number between 0 and 10,
+  "evaluation": "short evaluation",
   "nextQuestion": "the next interviewer question",
   "questionType": "concept | coding | followup"
 }
-
-Guidelines:
-- Use "coding" if the question requires writing code.
-- Use "concept" for theoretical questions.
-- Use "followup" if the question challenges the candidate's previous answer.
-- Do not add explanations outside the JSON.
-`;
+`
 
     const response = await groq.chat.completions.create({
         model:"llama-3.1-8b-instant",

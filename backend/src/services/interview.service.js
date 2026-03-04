@@ -70,12 +70,21 @@ export const continueInterviewService = async (sessionId) => {
         throw new Error("Session not found")
     }
 
+    const questionCount = session.messages.filter(msg=>msg.role === "interviewer").length
+    let difficultyLevel = "warmup";
+
+    if(questionCount >= 3) difficultyLevel = "core"
+    if(questionCount >= 6) difficultyLevel = "advanced"
+    if(questionCount >= 9) difficultyLevel = "challenge"
+
+    session.difficultyLevel = difficultyLevel
+
     const conversation = session.messages.map(msg=>({
         role:msg.role === "interviewer" ? "assistant" : "user",
         content:msg.content
     }))
 
-    const rawResponse = await continueInterviewWithAI(conversation, session.jobRole)
+    const rawResponse = await continueInterviewWithAI(conversation, session.jobRole, session.difficultyLevel)
 
     let parsed;
 

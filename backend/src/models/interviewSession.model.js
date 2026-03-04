@@ -25,6 +25,11 @@ const interviewSessionSchema = new mongoose.Schema(
                 }
             }
         ],
+        difficultyLevel:{
+            type:String,
+            enum:["warmup","core","advanced","challenge"],
+            default:"warmup"
+        },
         scores:[Number],
         totalScore:{
             type:Number,
