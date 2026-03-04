@@ -1,4 +1,4 @@
-import { createInterviewSessionService } from "../services/interview.service.js";
+import { getAnswerService, createInterviewSessionService, continueInterviewService } from "../services/interview.service.js";
 import asyncHandler from "../utils/async-handler.js";
 import { generateQuestionService } from "../services/interview.service.js";
 
@@ -19,6 +19,25 @@ export const generateQuestion = asyncHandler (async(req,res)=>{
     res.status(200).json({
         success:true,
         question
+    })
+})
+
+export const checkAnswer = asyncHandler (async(req,res)=>{
+    const {sessionId, answer} = req.body
+    const evaluation = await getAnswerService(sessionId,answer)
+    res.status(200).json({
+        success:true,
+        evaluation 
+    })
+})
+
+export const continueInterview = asyncHandler (async(req,res)=>{
+    const {sessionId} = req.body
+    const nextQuestion = await continueInterviewService(sessionId)
+
+    res.status(200).json({
+        success:true,
+        question: nextQuestion
     })
 })
 

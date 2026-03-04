@@ -7,8 +7,24 @@ const interviewSessionSchema = new mongoose.Schema(
             type:String,
             required:true,
         },
-        questions:[String],
-        answers:[String],
+        messages:[
+            {
+                role:{
+                    type: String,
+                    enum: ["interviewer","candidate"],
+                    required:true
+                },
+                content:{
+                    type:String,
+                    required:true
+                },
+                type:{
+                    type:String,
+                    enum:["concept","coding","followup"],
+                    default:"concept"
+                }
+            }
+        ],
         scores:[Number],
         totalScore:{
             type:Number,
