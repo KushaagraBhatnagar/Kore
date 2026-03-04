@@ -90,25 +90,26 @@ export const continueInterviewService = async (sessionId) => {
         throw new Error("AI returned invalid JSON: " + err.message)
     }
 
-    const {score, evaluation, nextQuestion} = parsed
+    const {score, evaluation, nextQuestion, questionType} = parsed
 
     if(typeof score !== "number"){
         throw new Error("Invalid score returned by AI")
     }
-    
+
     session.scores.push(score)
     session.totalScore += score
     session.messages.push({
         role:"interviewer",
         content:nextQuestion,
-        type:"followup"
+        type:questionType
     })
 
     await session.save()
     return {
         score,
         evaluation,
-        nextQuestion
+        nextQuestion,
+        questionType
     }
 }
 
