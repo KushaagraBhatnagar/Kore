@@ -75,15 +75,40 @@ export const continueInterviewService = async (sessionId) => {
         content:msg.content
     }))
 
-    const aiResponse = await continueInterviewWithAI(conversation, session.jobRole)
+    const rawResponse = await continueInterviewWithAI(conversation, session.jobRole)
 
+    let parsed;
+
+    try{
+        const cleaned = rawResponse
+            .replace(/```json/g, "")
+            .replace(/```/g, "")
+            .trim()
+        parsed = JSON.parse(cleaned)
+    }
+    catch(err){
+        throw new Error("AI returned invalid JSON: " + err.message)
+    }
+
+    const {score, evaluation, nextQuestion} = parsed
+
+    if(typeof score !== "number"){
+        throw new Error("Invalid score returned by AI")
+    }
+    
+    session.scores.push(score)
+    session.totalScore += score
     session.messages.push({
         role:"interviewer",
-        content:aiResponse,
+        content:nextQuestion,
         type:"followup"
     })
 
     await session.save()
-    return aiResponse
+    return {
+        score,
+        evaluation,
+        nextQuestion
+    }
 }
 
