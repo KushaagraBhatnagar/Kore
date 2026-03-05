@@ -1,6 +1,7 @@
 import InterviewSession from "../models/interviewSession.model.js";
 import { generateQuestionsFromAI, continueInterviewWithAI } from "../providers/ai.provider.js";
 
+
 export const generateQuestionService = async (sessionId) => {
     if(!sessionId){
         throw new Error("Session ID is required")
@@ -11,28 +12,34 @@ export const generateQuestionService = async (sessionId) => {
         throw new Error("Session not found")
     }
 
-    const question = await generateQuestionsFromAI(session.jobRole)
+    const {question, topic, type} = await generateQuestionsFromAI(session.jobRole)
 
     session.messages.push({
         role:"interviewer",
         content:question,
-        type:"concept"
+        type:type,
+        topic:topic,
+        score:null
     })
+
+    session.questionCount += 1
+    if(type === "coding"){
+        session.codingQuestionsAsked +=1
+    }
+    if(topic && !session.topicsCovered.includes(topic)){
+        session.topicsCovered.push(topic)
+    }
     await session.save()
     return question
 }
 
 export const createInterviewSessionService = async (jobRole)=>{
-    if(!jobRole){
+    if(!jobRole || !jobRole.trim()){
         throw new Error("Job role is required")
     }
 
     const session = await InterviewSession.create({
-        jobRole,
-        questions:[],
-        answers:[],
-        scores:[],
-        totalScore:0
+        jobRole: jobRole.trim()
     })
 
     return session
@@ -70,7 +77,11 @@ export const continueInterviewService = async (sessionId) => {
         throw new Error("Session not found")
     }
 
-    const questionCount = session.messages.filter(msg=>msg.role === "interviewer").length
+    if(session.status==="completed"){
+        throw new Error("Interview session is already completed")
+    }
+
+    const questionCount = session.questionCount
     let difficultyLevel = "warmup";
 
     if(questionCount >= 3) difficultyLevel = "core"
@@ -84,7 +95,7 @@ export const continueInterviewService = async (sessionId) => {
         content:msg.content
     }))
 
-    const rawResponse = await continueInterviewWithAI(conversation, session.jobRole, session.difficultyLevel)
+    const rawResponse = await continueInterviewWithAI(conversation, session.jobRole, session.difficultyLevel, session.topicsCovered)
 
     let parsed;
 
@@ -99,7 +110,11 @@ export const continueInterviewService = async (sessionId) => {
         throw new Error("AI returned invalid JSON: " + err.message)
     }
 
-    const {score, evaluation, nextQuestion, questionType} = parsed
+    const {score, evaluation, nextQuestion, questionType, topic} = parsed
+
+    if(topic && !session.topicsCovered.includes(topic)){
+        session.topicsCovered.push(topic)
+    }
 
     if(typeof score !== "number"){
         throw new Error("Invalid score returned by AI")
@@ -107,10 +122,17 @@ export const continueInterviewService = async (sessionId) => {
 
     session.scores.push(score)
     session.totalScore += score
+    session.questionCount += 1
+    if(questionType === "coding"){
+        session.codingQuestionsAsked +=1
+    }
+
     session.messages.push({
         role:"interviewer",
         content:nextQuestion,
-        type:questionType
+        type:questionType,
+        topic:topic,
+        score:score
     })
 
     await session.save()

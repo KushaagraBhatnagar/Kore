@@ -22,13 +22,43 @@ const interviewSessionSchema = new mongoose.Schema(
                     type:String,
                     enum:["concept","coding","followup"],
                     default:"concept"
+                },
+                topic:{
+                    type:String,
+                    default:null
+                },
+                score:{
+                    type:Number,
+                    default:null
                 }
             }
         ],
+        topicsCovered:[
+            {
+                type:String
+            }
+        ],
+        questionCount:{
+            type:Number,
+            default:0
+        },
+        codingQuestionsAsked:{
+            type:Number,
+            default:0
+        },
         difficultyLevel:{
             type:String,
             enum:["warmup","core","advanced","challenge"],
             default:"warmup"
+        },
+        startTime:{
+            type:Date,
+            default:Date.now
+        },
+        status:{
+            type:String,
+            enum:["active","completed"],
+            default:"active"
         },
         scores:[Number],
         totalScore:{
