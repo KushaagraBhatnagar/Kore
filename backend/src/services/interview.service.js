@@ -1,6 +1,8 @@
 import InterviewSession from "../models/interviewSession.model.js";
 import { generateQuestionsFromAI, continueInterviewWithAI } from "../providers/ai.provider.js";
 
+const MAX_QUESTIONS = 10;
+const MAX_DURATION_MINUTES = 20;
 
 export const generateQuestionService = async (sessionId) => {
     if(!sessionId){
@@ -81,6 +83,17 @@ export const continueInterviewService = async (sessionId) => {
         throw new Error("Interview session is already completed")
     }
 
+    const interviewDuration = (Date.now()- new Date(session.startTime).getTime())/60000
+    if(session.questionCount >= MAX_QUESTIONS || interviewDuration >= MAX_DURATION_MINUTES){
+        session.status = "completed"
+        await session.save()
+
+        return{
+            interviewCompleted:true,
+            finalScore: session.totalScore,
+            totalQuestions: session.questionCount,
+        }
+    }
     const questionCount = session.questionCount
     let difficultyLevel = "warmup";
 
@@ -112,12 +125,13 @@ export const continueInterviewService = async (sessionId) => {
 
     const {score, evaluation, nextQuestion, questionType, topic} = parsed
 
-    if(topic && !session.topicsCovered.includes(topic)){
-        session.topicsCovered.push(topic)
-    }
 
     if(typeof score !== "number"){
         throw new Error("Invalid score returned by AI")
+    }
+
+    if(topic && !session.topicsCovered.includes(topic)){
+        session.topicsCovered.push(topic)
     }
 
     session.scores.push(score)
@@ -137,6 +151,7 @@ export const continueInterviewService = async (sessionId) => {
 
     await session.save()
     return {
+        interviewCompleted:false,
         score,
         evaluation,
         nextQuestion,
