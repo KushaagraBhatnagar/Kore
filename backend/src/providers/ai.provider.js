@@ -63,7 +63,7 @@ export const generateQuestionsFromAI = async (jobRole)=>{
     return JSON.parse(cleaned)
 }
 
-export const continueInterviewWithAI = async (conversation, jobRole, difficultyLevel, topicsCovered = []) => {
+export const continueInterviewWithAI = async (conversation, jobRole, difficultyLevel, topicsCovered = [], suggestedTopic) => {
     if(!process.env.OPENAI_API_KEY){
         throw new Error("OPENAI_API_KEY not found in environment variables")
     }
@@ -74,59 +74,45 @@ export const continueInterviewWithAI = async (conversation, jobRole, difficultyL
     })
 
     const systemPrompt = `
-            You are a senior FAANG-level technical interviewer.
+You are a senior FAANG-level technical interviewer.
 
-            You are conducting a mock interview for the role: ${jobRole}.
+Role: ${jobRole}
 
-            Current interview stage: ${difficultyLevel}
+Current difficulty stage: ${difficultyLevel}
 
-            Topics already covered in this interview:
-            ${topicsCovered.length ? topicsCovered.join(", ") : "none"}
+Topics already covered:
+${topicsCovered.join(", ") || "none"}
 
-            Avoid repeating these topics unless asking a follow-up.
+Suggested next topic:
+${suggestedTopic}
 
-            Difficulty guidelines:
+Evaluate the candidate answer and decide how the interview should proceed.
 
-            warmup:
-            - basic conceptual questions
-            - simple understanding checks
+Rules:
 
-            core:
-            - practical engineering questions
-            - real-world scenarios
+If the answer is weak or incomplete:
+→ decision = followup
+Ask a deeper question on the SAME topic.
 
-            advanced:
-            - deeper technical questions
-            - debugging and architecture reasoning
+If the answer is good:
+→ decision = move_topic
+Move to a new topic according to the suggested topic i.e (${suggestedTopic}) and ask next question about it.
 
-            challenge:
-            - complex algorithmic or system design problems
+If the candidate shows very strong understanding:
+→ decision = coding_question
+Ask a coding problem related to the topic.
 
-            When the candidate answers a question you must:
+Return ONLY JSON:
 
-            1. Evaluate the candidate answer
-            2. Give a short evaluation
-            3. Ask the next question
-            4. Identify the main topic of the new question
-
-            Return ONLY valid JSON:
-
-            {
-            "score": number between 0 and 10,
-            "evaluation": "short evaluation",
-            "nextQuestion": "the next interviewer question",
-            "questionType": "concept | coding | followup",
-            "topic": "main technical topic of the question"
-            }
-
-            Example topic values:
-            "closures"
-            "event loop"
-            "react rendering"
-            "linked list"
-            "dynamic programming"
-            "system design"
-        `
+{
+ "score": number between 0 and 10,
+ "evaluation": "short evaluation",
+ "decision": "followup | move_topic | coding_question",
+ "nextQuestion": "interviewer question",
+ "questionType": "concept | coding | followup",
+ "topic": "topic of the question"
+}
+`
 
     const response = await groq.chat.completions.create({
         model:"llama-3.1-8b-instant",
