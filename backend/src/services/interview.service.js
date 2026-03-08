@@ -2,6 +2,7 @@ import InterviewSession from "../models/interviewSession.model.js";
 import { generateQuestionsFromAI, continueInterviewWithAI } from "../providers/ai.provider.js";
 import { selectNextTopic } from "../utils/topicSelector.js";
 import { calculateDifficulty } from "../utils/difficultyEngine.js";
+import { validateAIResponse } from "../utils/aiResponseValidator.js";
 
 const MAX_QUESTIONS = 10;
 const MAX_DURATION_MINUTES = 20;
@@ -109,29 +110,10 @@ export const continueInterviewService = async (sessionId) => {
 
     const rawResponse = await continueInterviewWithAI(conversation, session.jobRole, session.difficultyLevel, session.topicsCovered, suggestedTopic)
 
-    let parsed;
-
-    try{
-        const cleaned = rawResponse
-            .replace(/```json/g, "")
-            .replace(/```/g, "")
-            .trim()
-        const match = cleaned.match(/{[\s\S]*}/)
-        if(!match){
-            throw new Error("No JSON object found in AI response")
-        }
-        parsed = JSON.parse(match[0])
-    }
-    catch(err){
-        throw new Error("AI returned invalid JSON: " + err.message)
-    }
+    const parsed = await validateAIResponse(rawResponse)
 
     const {score, evaluation, decision, nextQuestion, questionType, topic} = parsed
 
-    const allowedDecisions = ["followup", "move_topic", "coding_question"]
-    if(!allowedDecisions.includes(decision)){
-        throw new Error("Invalid decision returned by AI")
-    }
 
     let finalTopic = topic
     if(decision === "move_topic"){
@@ -144,10 +126,6 @@ export const continueInterviewService = async (sessionId) => {
         finalTopic = topic || session.currentTopic
     }
     session.currentTopic = finalTopic
-    
-    if(typeof score !== "number"){
-        throw new Error("Invalid score returned by AI")
-    }
 
     const normalizedTopic = finalTopic ? finalTopic.toLowerCase() : null
     if(normalizedTopic && !session.topicsCovered.includes(normalizedTopic)){
