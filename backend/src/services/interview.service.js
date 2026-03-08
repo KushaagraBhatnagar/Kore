@@ -6,6 +6,7 @@ import { validateAIResponse } from "../utils/aiResponseValidator.js";
 
 const MAX_QUESTIONS = 10;
 const MAX_DURATION_MINUTES = 20;
+const MAX_CONTEXT_MESSAGES = 10;
 
 export const generateQuestionService = async (sessionId) => {
     if(!sessionId){
@@ -101,7 +102,8 @@ export const continueInterviewService = async (sessionId) => {
     
     session.difficultyLevel = calculateDifficulty(session.scores)
 
-    const conversation = session.messages.map(msg=>({
+    const recentMessages = session.messages.slice(-MAX_CONTEXT_MESSAGES)
+    const conversation = recentMessages.map(msg=>({
         role:msg.role === "interviewer" ? "assistant" : "user",
         content:msg.content
     }))
