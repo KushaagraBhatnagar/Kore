@@ -116,6 +116,7 @@ export const continueInterviewService = async (sessionId) => {
 
     const {score, evaluation, decision, nextQuestion, questionType, topic} = parsed
 
+    session.currentQuestionType = questionType
 
     let finalTopic = topic
     if(decision === "move_topic"){
