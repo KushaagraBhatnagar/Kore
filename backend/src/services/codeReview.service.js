@@ -21,10 +21,26 @@ export const reviewCodeService = async (sessionId, code, language)=>{
     }
 
     const question = lastQuestion.content
+
+    session.messages.push({
+        role:"candidate",
+        content:code,
+        type:"coding",
+        topic:lastQuestion.topic || null,
+        score:score
+    })
+    
     const review = await reviewCodeWithAI(question, code, language)
 
     const score = review.score || 0
 
+    session.messages.push({
+        role:"interviewer",
+        content:review.feedback,
+        type:"coding",
+        topic:lastQuestion.topic || null,
+        score:score
+    })
     session.scores.push(score)
     session.totalScore += score
     await session.save()
