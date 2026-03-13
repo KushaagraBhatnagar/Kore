@@ -48,6 +48,10 @@ const interviewSessionSchema = new mongoose.Schema(
             enum:["concept","coding","followup"],
             default:"concept"
         },
+        currentTopic:{
+            type:String,
+            default:null
+        },
         codingQuestionsAsked:{
             type:Number,
             default:0

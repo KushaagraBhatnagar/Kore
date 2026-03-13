@@ -1,5 +1,4 @@
 import {z} from "zod";
-import { selectNextTopic } from "./topicSelector";
 
 const aiInterviewResponseSchema = z.object({
     score: z.number().min(0).max(10),

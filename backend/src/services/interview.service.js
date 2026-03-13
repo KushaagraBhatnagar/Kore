@@ -20,20 +20,26 @@ export const generateQuestionService = async (sessionId) => {
 
     const {question, topic, type} = await generateQuestionsFromAI(session.jobRole)
 
+    const normalisedTopic = topic ? topic.toLowerCase() : null
+    session.currentQuestionType = type
+    session.currentTopic = normalisedTopic
+
     session.messages.push({
         role:"interviewer",
         content:question,
         type:type,
-        topic:topic,
+        topic:normalisedTopic,
         score:null
     })
+
+
 
     session.questionCount += 1
     if(type === "coding"){
         session.codingQuestionsAsked +=1
     }
-    if(topic && !session.topicsCovered.includes(topic)){
-        session.topicsCovered.push(topic)
+    if(normalisedTopic && !session.topicsCovered.includes(normalisedTopic)){
+        session.topicsCovered.push(normalisedTopic)
     }
     await session.save()
     return question
@@ -52,7 +58,7 @@ export const createInterviewSessionService = async (jobRole)=>{
 }
 
 export const getAnswerService = async (sessionId,answer)=>{
-    if(!sessionId || !answer){
+    if(!sessionId || !answer || !answer.trim()){
         throw new Error("Session ID and answer are required")
     }
     
@@ -62,9 +68,25 @@ export const getAnswerService = async (sessionId,answer)=>{
         throw new Error("Session not found")
     }
 
+    if(session.status === "completed"){
+        throw new Error("Interview session is already completed")
+    }
+
+    if(session.currentQuestionType === "coding"){
+        throw new Error("Use /api/code/review for coding answers")
+    }
+
+    const lastInterviewerMessage = [...session.messages].reverse().find(msg=>msg.role === "interviewer")
+    if(!lastInterviewerMessage){
+        throw new Error("No question found for this session")
+    }
+
     session.messages.push({
         role:"candidate",
-        content:answer
+        content:answer.trim(),
+        type:lastInterviewerMessage.type || "concept",
+        topic:lastInterviewerMessage.topic || null,
+        score:null
     })
 
     await session.save()
@@ -87,19 +109,11 @@ export const continueInterviewService = async (sessionId) => {
         throw new Error("Interview session is already completed")
     }
 
-    const interviewDuration = (Date.now()- new Date(session.startTime).getTime())/60000
-    if(session.questionCount >= MAX_QUESTIONS || interviewDuration >= MAX_DURATION_MINUTES){
-        session.status = "completed"
-        await session.save()
-
-        return{
-            interviewCompleted:true,
-            finalScore: session.totalScore,
-            totalQuestions: session.questionCount,
-        }
+    const lastMessage = session.messages[session.messages.length -1]
+    if(!lastMessage || lastMessage.role !== "candidate"){
+        throw new Error("Last message must be from candidate to continue the interview")
     }
-    const questionCount = session.questionCount
-    
+
     session.difficultyLevel = calculateDifficulty(session.scores)
 
     const recentMessages = session.messages.slice(-MAX_CONTEXT_MESSAGES)
@@ -112,15 +126,35 @@ export const continueInterviewService = async (sessionId) => {
 
     const rawResponse = await continueInterviewWithAI(conversation, session.jobRole, session.difficultyLevel, session.topicsCovered, suggestedTopic)
 
-    const parsed = await validateAIResponse(rawResponse)
+    const parsed = validateAIResponse(rawResponse)
 
     const {score, evaluation, decision, nextQuestion, questionType, topic} = parsed
 
+    lastMessage.score = score
+    session.scores.push(score)
+    session.totalScore += score
+
+    const interviewDuration = (Date.now()- new Date(session.startTime).getTime())/60000
+    
+    if(session.questionCount >= MAX_QUESTIONS || interviewDuration >= MAX_DURATION_MINUTES){
+        session.status = "completed"
+        await session.save()
+
+        return{
+            interviewCompleted:true,
+            score,
+            evaluation,
+            finalScore: session.totalScore,
+            totalQuestions: session.questionCount,
+        }
+    }    
+    
+
     session.currentQuestionType = questionType
 
-    let finalTopic = topic
+    let finalTopic = topic ? topic.toLowerCase() : null
     if(decision === "move_topic"){
-        finalTopic = suggestedTopic
+        finalTopic = suggestedTopic ? suggestedTopic.toLowerCase() : finalTopic
     }
     if(decision === "followup"){
         finalTopic = session.currentTopic || topic
@@ -128,15 +162,13 @@ export const continueInterviewService = async (sessionId) => {
     if(decision === "coding_question"){
         finalTopic = topic || session.currentTopic
     }
+    session.currentQuestionType = questionType
     session.currentTopic = finalTopic
 
-    const normalizedTopic = finalTopic ? finalTopic.toLowerCase() : null
-    if(normalizedTopic && !session.topicsCovered.includes(normalizedTopic)){
-        session.topicsCovered.push(normalizedTopic)
+    if(finalTopic && !session.topicsCovered.includes(finalTopic)){
+        session.topicsCovered.push(finalTopic)
     }
 
-    session.scores.push(score)
-    session.totalScore += score
     session.questionCount += 1
     if(questionType === "coding"){
         session.codingQuestionsAsked +=1

@@ -2,7 +2,7 @@ import { reviewCodeWithAI } from "../providers/codeReview.provider.js";
 import InterviewSession from "../models/interviewSession.model.js";
 
 export const reviewCodeService = async (sessionId, code, language)=>{
-    if(!sessionId || !code){
+    if(!sessionId || !code || !code.trim()){
         throw new Error("Session ID and code are required")
     }
 
@@ -10,6 +10,14 @@ export const reviewCodeService = async (sessionId, code, language)=>{
 
     if(!session){
         throw new Error("Session not found")
+    }
+
+    if(session.status === "completed"){
+        throw new Error("Interview session is already completed")
+    }
+
+    if(session.currentQuestionType !== "coding"){
+        throw new Error("Current question is not a coding question")
     }
 
     const lastQuestion = session.messages

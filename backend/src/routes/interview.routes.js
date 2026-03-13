@@ -9,4 +9,5 @@ router.post("/generate-question",aiRateLimiter,generateQuestion)
 router.post("/submit-answer",aiRateLimiter, checkAnswer);
 router.post("/continue-interview", aiRateLimiter, continueInterview);
 router.get("/report/:sessionId", generateInterviewReport)
+router.get("/session/:sessionId", getSession)
 export default router

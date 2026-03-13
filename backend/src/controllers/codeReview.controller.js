@@ -1,5 +1,5 @@
-import asyncHandler from "../utils/async-handler";
-import { reviewCodeService } from "../services/codeReview.service";
+import asyncHandler from "../utils/async-handler.js";
+import { reviewCodeService } from "../services/codeReview.service.js";
 
 export const reviewCodeController = asyncHandler(async(req,res)=>{
     const {sessionId, code, language} = req.body
