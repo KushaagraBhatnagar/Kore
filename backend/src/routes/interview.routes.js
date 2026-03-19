@@ -2,6 +2,7 @@ import express from "express"
 import createSession, { checkAnswer, generateQuestion, continueInterview } from "../controllers/interview.controller.js"
 import { generateInterviewReport } from "../controllers/interview.analytics.controller.js"
 import { aiRateLimiter } from "../middlewares/rateLimiter.middleware.js"
+import { getSession } from "../controllers/session.controller.js"
 const router = express.Router()
 
 router.post("/create",createSession)

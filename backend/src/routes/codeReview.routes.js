@@ -1,5 +1,5 @@
 import express from "express"
-import { reviewCodeController } from "../controllers/codeReview.controller"
+import { reviewCodeController } from "../controllers/codeReview.controller.js"
 
 const codeReviewRouter = express.Router()
 

@@ -6,6 +6,7 @@ export const selectNextTopic = (jobRole, topicsCovered) =>{
 
     const categories = roleTopicMap[role] || ["backend"]
 
+    const lowerTopicsCovered = topicsCovered.map(t=>t.toLowerCase())
     let subtopicPool = []
 
     categories.forEach(category => {
@@ -14,7 +15,7 @@ export const selectNextTopic = (jobRole, topicsCovered) =>{
 
         Object.keys(topics).forEach(topic => {
             topics[topic].forEach(subtopic=>{
-                if(!topicsCovered.includes(subtopic)){
+                if(!lowerTopicsCovered.includes(subtopic.toLowerCase())){
                     subtopicPool.push(subtopic)
                 }
             })

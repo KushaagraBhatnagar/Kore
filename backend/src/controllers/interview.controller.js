@@ -18,7 +18,9 @@ export const generateQuestion = asyncHandler (async(req,res)=>{
     const question = await generateQuestionService(sessionId)
     res.status(200).json({
         success:true,
-        question
+        question,
+        questionType: question.type,
+        questionTopic: question.topic
     })
 })
 

@@ -42,7 +42,11 @@ export const generateQuestionService = async (sessionId) => {
         session.topicsCovered.push(normalisedTopic)
     }
     await session.save()
-    return question
+    return {
+        question,
+        topic: normalisedTopic,
+        type
+    }
 }
 
 export const createInterviewSessionService = async (jobRole)=>{
@@ -110,17 +114,34 @@ export const continueInterviewService = async (sessionId) => {
     }
 
     const lastMessage = session.messages[session.messages.length -1]
-    if(!lastMessage || lastMessage.role !== "candidate"){
-        throw new Error("Last message must be from candidate to continue the interview")
+    
+    const isAfterCodingReview = lastMessage.role === "interviewer" && lastMessage.type === "coding"
+    if(!lastMessage || (lastMessage.role !== "candidate" && !isAfterCodingReview)){
+        throw new Error("Last message must be a candidate answer or coding review feedback")
     }
 
     session.difficultyLevel = calculateDifficulty(session.scores)
 
-    const recentMessages = session.messages.slice(-MAX_CONTEXT_MESSAGES)
-    const conversation = recentMessages.map(msg=>({
-        role:msg.role === "interviewer" ? "assistant" : "user",
-        content:msg.content
+    const conversation = [
+        {
+            role:"system",
+            content:`You are a senior FAANG-level technical interviewer for the role of ${session.jobRole}. Current difficulty: ${session.difficultyLevel}.`
+        }
+    ]
+    if(session.messages.length>0){
+        const pinnedIntro = session.messages.slice(0,2).map(msg=>({
+            role: msg.role === "interviewer" ? "assistant" : "user",
+            content: msg.content
+        }))
+        conversation.push(...pinnedIntro)
+    }
+
+    const recentBuffer = session.messages.slice(2).slice(-6).map(msg=>({
+        role: msg.role === "interviewer" ? "assistant" : "user",
+        content: msg.content
     }))
+
+    conversation.push(...recentBuffer)
 
     const suggestedTopic = selectNextTopic(session.jobRole, session.topicsCovered)   
 
@@ -130,9 +151,14 @@ export const continueInterviewService = async (sessionId) => {
 
     const {score, evaluation, decision, nextQuestion, questionType, topic} = parsed
 
-    lastMessage.score = score
-    session.scores.push(score)
-    session.totalScore += score
+    if(lastMessage.score===null){
+        lastMessage.score = score
+        session.scores.push(score)
+        session.totalScore += score
+    }else{
+        console.log(`Score for last message already set, skipping score update for session id ${session._id}`)
+    }
+    
 
     const interviewDuration = (Date.now()- new Date(session.startTime).getTime())/60000
     

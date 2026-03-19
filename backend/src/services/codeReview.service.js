@@ -30,6 +30,9 @@ export const reviewCodeService = async (sessionId, code, language)=>{
 
     const question = lastQuestion.content
 
+    const review = await reviewCodeWithAI(question, code, language)
+    const score = review.score || 0
+
     session.messages.push({
         role:"candidate",
         content:code,
@@ -38,10 +41,6 @@ export const reviewCodeService = async (sessionId, code, language)=>{
         score:score
     })
     
-    const review = await reviewCodeWithAI(question, code, language)
-
-    const score = review.score || 0
-
     session.messages.push({
         role:"interviewer",
         content:review.feedback,

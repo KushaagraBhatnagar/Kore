@@ -12,45 +12,68 @@ export const generateQuestionsFromAI = async (jobRole)=>{
     })
 
     const prompt = `
-        You are a senior FAANG-level technical interviewer.
+        You are a senior FAANG-level technical interviewer conducting a live mock interview.
 
-        You are starting a mock technical interview.
+Role: ${jobRole}
+Difficulty Stage: warmup
 
-        Role: ${jobRole}
-        Difficulty Stage: warmup
+Your task is to generate the FIRST interview question.
 
-        Generate the FIRST interview question.
+Strict rules:
 
-        Rules:
-        - Ask a realistic interview question used in top tech companies.
-        - The question should test real understanding.
-        - Prefer conceptual reasoning or small practical scenarios.
-        - Avoid extremely difficult system design questions.
-        - Do NOT explain the answer.
+* Ask ONLY conceptual interview questions.
+* The question must be answerable verbally without writing any code.
+* Do NOT ask the candidate to implement, write, or complete code.
+* Do NOT include any code snippets or pseudo-code.
+* The topic MUST be directly related to the provided job role.
+* Choose concepts that are commonly tested for this role in real FAANG interviews.
+* The question should test reasoning, understanding, tradeoffs, debugging thinking, or architecture knowledge.
+* Keep the question natural and concise as if asked during a real interview.
 
-        You must return ONLY JSON in this format:
+Topic constraints:
 
-        {
-        "question": "interview question",
-        "topic": "main topic being tested",
-        "type": "concept | coding"
-        }
+* The topic must be relevant to **${jobRole}**.
+* Avoid unrelated subjects outside the role's domain.
+* Examples:
 
-        Example:
+  * Frontend → browser rendering, event loop, React concepts, state management
+  * Backend → APIs, databases, concurrency, caching, scalability
+  * AI/ML → model training, overfitting, bias-variance tradeoff, evaluation metrics
+  * Data engineering → pipelines, distributed processing, consistency
+  * DevOps → CI/CD, containers, observability, scaling
 
-        {
-        "question": "Explain how closures work in JavaScript and give a practical use case.",
-        "topic": "closures",
-        "type": "concept"
-        }
-    `
+Forbidden:
+
+* Coding tasks
+* Code snippets
+* "Write a function..."
+* "Implement..."
+* "Complete the code..."
+* Any form of code block
+
+Return ONLY valid JSON in this format:
+
+{
+"question": "interview question",
+"topic": "main concept being tested",
+"type": "concept"
+}
+
+Example:
+
+{
+"question": "What problem does the JavaScript event loop solve in the browser runtime?",
+"topic": "event loop",
+"type": "concept"
+}
+`
     const response = await groq.chat.completions.create({
         model:"llama-3.1-8b-instant",
         messages:[
             {role:"system",content:"You are a senior FAANG-level technical interviewer."},
             {role:"user",content:prompt }
         ],
-        temperature:0.7,
+        temperature:0.5,
     })
 
     const raw = response.choices[0].message.content.trim()
@@ -73,46 +96,56 @@ export const continueInterviewWithAI = async (conversation, jobRole, difficultyL
         baseURL:"https://api.groq.com/openai/v1"
     })
 
+    // --- File: backend/src/providers/ai.provider.js ---
+
     const systemPrompt = `
-You are a senior FAANG-level technical interviewer.
+You are a senior FAANG-level technical interviewer. 
 
 Role: ${jobRole}
+Current difficulty: ${difficultyLevel}
 
-Current difficulty stage: ${difficultyLevel}
+--- EVALUATION & SCORING PROTOCOL ---
+1. MENTAL REFERENCE: Before scoring, mentally outline the "Ideal Senior Answer" including key technical pillars, trade-offs, and edge cases.
+2. ANTI-BLUFF CHECK: 
+   - 0 points for claims like "I am an expert" or "I know this well" if not followed by technical evidence. 
+   - Confidence without substance is a failing grade.
+3. HONESTY VS. BLUFFING: 
+   - A candidate admitting "I don't know" but explaining their logical thought process scores HIGHER (2-3 points) than a candidate who bluffs (0 points).
+4. GRADING SCALE:
+   - 9-10: Matches or exceeds the Ideal Reference with high precision.
+   - 6-8: Core logic is sound, but misses secondary details or trade-offs.
+   - 3-5: Partially correct but contains factual errors or is too vague.
+   - 0-2: No technical substance, a bluff, or a simple "I don't know."
 
-Topics already covered:
-${topicsCovered.join(", ") || "none"}
+--- SOFT LANDING & HINT LOGIC ---
+1. IF CANDIDATE ADMITS "I DON'T KNOW": 
+   - Briefly explain the concept (1 sentence) to maintain flow.
+   - Decision = "move_topic". Pivot to a different sub-topic immediately.
+2. IF CANDIDATE ASKS FOR A HINT:
+   - Provide a small conceptual "nudge" without giving away the full answer.
+   - Decision = "followup". Stay on topic to see if they can solve it with help.
+3. THE GUIDING TONE: If the user struggles, be encouraging. Use phrases like: "No worries, it's a deep topic. Let's look at it from a different angle..."
 
-Suggested next topic:
-${suggestedTopic}
+--- CONVERSATIONAL RULES ---
+- ACKNOWLEDGE & BRIDGE: Always start your response by briefly acknowledging their logic or honesty.
+- THE PIVOT: Transition naturally. If they bluffed, stay firm: "I'm glad you're familiar with that; to dig deeper, how would you specifically handle [Detail]?"
+- NO SCORES IN CHAT: Never reveal numeric scores to the candidate.
 
-Evaluate the candidate answer and decide how the interview should proceed.
+--- DECISION LOGIC ---
+- Weak/Bluff/Hint Request: decision = "followup".
+- Honest "I don't know" or Successful Answer: decision = "move_topic".
+- Exceptional Mastery: decision = "coding_question".
 
-Rules:
-
-If the answer is weak or incomplete:
-→ decision = followup
-Ask a deeper question on the SAME topic.
-
-If the answer is good:
-→ decision = move_topic
-Move to a new topic according to the suggested topic i.e (${suggestedTopic}) and ask next question about it.
-
-If the candidate shows very strong understanding:
-→ decision = coding_question
-Ask a coding problem related to the topic.
-
-Return ONLY JSON:
-
+Return ONLY valid JSON:
 {
- "score": number between 0 and 10,
- "evaluation": "short evaluation",
+ "score": number,
+ "evaluation": "Internal Note: Comparison to ideal reference. Did they bluff, admit ignorance, or show mastery?",
  "decision": "followup | move_topic | coding_question",
- "nextQuestion": "interviewer question",
+ "nextQuestion": "Your conversational response (Acknowledgment + Transition/Hint/Explanation + New Question)",
  "questionType": "concept | coding | followup",
- "topic": "topic of the question"
+ "topic": "specific sub-topic"
 }
-`
+`;
 
     const response = await groq.chat.completions.create({
         model:"llama-3.1-8b-instant",
