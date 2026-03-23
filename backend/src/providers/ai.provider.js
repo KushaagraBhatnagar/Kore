@@ -1,5 +1,21 @@
 import OpenAI from "openai"
 
+const extractFirstJsonObject = (text) => {
+    const cleaned = text
+        .replace(/```json/gi, "")
+        .replace(/```/g, "")
+        .trim()
+
+    const start = cleaned.indexOf("{")
+    const end = cleaned.lastIndexOf("}")
+
+    if (start === -1 || end === -1 || end <= start) {
+        throw new Error("AI did not return valid JSON")
+    }
+
+    return cleaned.slice(start, end + 1)
+}
+
 export const generateQuestionsFromAI = async (jobRole)=>{
 
     if (!process.env.OPENAI_API_KEY) {
@@ -69,21 +85,18 @@ Example:
 `
     const response = await groq.chat.completions.create({
         model:"llama-3.1-8b-instant",
+        response_format: { type: "json_object" },
         messages:[
             {role:"system",content:"You are a senior FAANG-level technical interviewer."},
             {role:"user",content:prompt }
         ],
-        temperature:0.5,
+        temperature:0.3,
     })
 
-    const raw = response.choices[0].message.content.trim()
-
-    const cleaned = raw
-        .replace(/```json/g, "")
-        .replace(/```/g, "")
-        .trim()
+    const raw = response.choices[0].message.content?.trim() || ""
+    const jsonString = extractFirstJsonObject(raw)
     
-    return JSON.parse(cleaned)
+    return JSON.parse(jsonString)
 }
 
 export const continueInterviewWithAI = async (conversation, jobRole, difficultyLevel, topicsCovered = [], suggestedTopic) => {
@@ -96,7 +109,6 @@ export const continueInterviewWithAI = async (conversation, jobRole, difficultyL
         baseURL:"https://api.groq.com/openai/v1"
     })
 
-    // --- File: backend/src/providers/ai.provider.js ---
 
     const systemPrompt = `
 You are a senior FAANG-level technical interviewer. 
@@ -149,12 +161,13 @@ Return ONLY valid JSON:
 
     const response = await groq.chat.completions.create({
         model:"llama-3.1-8b-instant",
+        response_format: { type: "json_object" },
         messages:[
             {role:'system',content:systemPrompt},
             ...conversation
         ],
-        temperature:0.7
+        temperature:0.2
     })
 
-    return response.choices[0].message.content.trim()
+    return response.choices[0].message.content?.trim() || ""
 }

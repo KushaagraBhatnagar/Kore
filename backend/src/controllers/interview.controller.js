@@ -51,8 +51,8 @@ export const continueInterview = asyncHandler (async(req,res)=>{
         interviewCompleted:false,
         score: result.score,
         evaluation: result.evaluation,
-        question: result.nextQuestion,
-        type:result.questionType
+        nextQuestion: result.nextQuestion,
+        questionType:result.questionType
     })
 })
 
