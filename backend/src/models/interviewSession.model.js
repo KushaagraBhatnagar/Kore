@@ -7,32 +7,7 @@ const interviewSessionSchema = new mongoose.Schema(
             type:String,
             required:true,
         },
-        messages:[
-            {
-                role:{
-                    type: String,
-                    enum: ["interviewer","candidate"],
-                    required:true
-                },
-                content:{
-                    type:String,
-                    required:true
-                },
-                type:{
-                    type:String,
-                    enum:["concept","coding","followup"],
-                    default:"concept"
-                },
-                topic:{
-                    type:String,
-                    default:null
-                },
-                score:{
-                    type:Number,
-                    default:null
-                }
-            }
-        ],
+        
         topicsCovered:[
             {
                 type:String
