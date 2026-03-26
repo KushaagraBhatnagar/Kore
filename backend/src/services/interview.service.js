@@ -3,6 +3,7 @@ import { generateQuestionsFromAI, continueInterviewWithAI } from "../providers/a
 import { selectNextTopic } from "../utils/topicSelector.js";
 import { calculateDifficulty } from "../utils/difficultyEngine.js";
 import { validateAIResponse } from "../utils/aiResponseValidator.js";
+import Message from "../models/message.model.js";
 
 const MAX_QUESTIONS = 10;
 const MAX_DURATION_MINUTES = 20;
@@ -21,13 +22,17 @@ export const generateQuestionService = async (sessionId) => {
     const {question, topic, type} = await generateQuestionsFromAI(session.jobRole)
 
     const normalisedTopic = topic ? topic.toLowerCase() : null
-    session.currentQuestionType = type
+
+    const validTypes = ["concept", "coding", "followup"]
+    const safeType = validTypes.includes(type)? type: "concept"
+    session.currentQuestionType = safeType
     session.currentTopic = normalisedTopic
 
-    session.messages.push({
+    await Message.create({
+        sessionId: session._id,
         role:"interviewer",
         content:question,
-        type:type,
+        type:safeType,
         topic:normalisedTopic,
         score:null
     })
@@ -80,12 +85,14 @@ export const getAnswerService = async (sessionId,answer)=>{
         throw new Error("Use /api/code/review for coding answers")
     }
 
-    const lastInterviewerMessage = [...session.messages].reverse().find(msg=>msg.role === "interviewer")
+    const messages = await Message.find({sessionId}).sort({createdAt:1})
+    const lastInterviewerMessage = [...messages].reverse().find(msg=>msg.role === "interviewer")
     if(!lastInterviewerMessage){
         throw new Error("No question found for this session")
     }
 
-    session.messages.push({
+    await Message.create({
+        sessionId: session._id,
         role:"candidate",
         content:answer.trim(),
         type:lastInterviewerMessage.type || "concept",
@@ -99,7 +106,7 @@ export const getAnswerService = async (sessionId,answer)=>{
     };
 }
 
-export const continueInterviewService = async (sessionId) => {
+export const continueInterviewService = async (sessionId, io) => {
     if(!sessionId){
         throw new Error("Session ID is required")
     }
@@ -113,7 +120,8 @@ export const continueInterviewService = async (sessionId) => {
         throw new Error("Interview session is already completed")
     }
 
-    const lastMessage = session.messages[session.messages.length -1]
+    const messages = await Message.find({sessionId}).sort({createdAt:1})
+    const lastMessage = messages[messages.length -1]
     
     const isAfterCodingReview = lastMessage.role === "interviewer" && lastMessage.type === "coding"
     if(!lastMessage || (lastMessage.role !== "candidate" && !isAfterCodingReview)){
@@ -128,15 +136,15 @@ export const continueInterviewService = async (sessionId) => {
             content:`You are a senior FAANG-level technical interviewer for the role of ${session.jobRole}. Current difficulty: ${session.difficultyLevel}.`
         }
     ]
-    if(session.messages.length>0){
-        const pinnedIntro = session.messages.slice(0,2).map(msg=>({
+    if(messages.length>0){
+        const pinnedIntro = messages.slice(0,2).map(msg=>({
             role: msg.role === "interviewer" ? "assistant" : "user",
             content: msg.content
         }))
         conversation.push(...pinnedIntro)
     }
 
-    const recentBuffer = session.messages.slice(2).slice(-6).map(msg=>({
+    const recentBuffer = messages.slice(2).slice(-6).map(msg=>({
         role: msg.role === "interviewer" ? "assistant" : "user",
         content: msg.content
     }))
@@ -145,7 +153,7 @@ export const continueInterviewService = async (sessionId) => {
 
     const suggestedTopic = selectNextTopic(session.jobRole, session.topicsCovered)   
 
-    const rawResponse = await continueInterviewWithAI(conversation, session.jobRole, session.difficultyLevel, session.topicsCovered, suggestedTopic)
+    const rawResponse = await continueInterviewWithAI(conversation, session.jobRole, session.difficultyLevel, session.topicsCovered, suggestedTopic, io, sessionId)
 
     const parsed = validateAIResponse(rawResponse)
 
@@ -153,6 +161,7 @@ export const continueInterviewService = async (sessionId) => {
 
     if(lastMessage.score===null){
         lastMessage.score = score
+        await lastMessage.save()
         session.scores.push(score)
         session.totalScore += score
     }else{
@@ -200,12 +209,13 @@ export const continueInterviewService = async (sessionId) => {
         session.codingQuestionsAsked +=1
     }
 
-    session.messages.push({
-        role:"interviewer",
-        content:nextQuestion,
-        type:questionType,
-        topic:finalTopic,
-        score:score
+    await Message.create({
+        sessionId: session._id,
+        role: "interviewer",
+        content: nextQuestion,
+        type: questionType,
+        topic: finalTopic,
+        score: score
     })
 
     await session.save()

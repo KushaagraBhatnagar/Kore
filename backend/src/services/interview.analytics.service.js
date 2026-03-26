@@ -1,5 +1,5 @@
 import InterviewSession from "../models/interviewSession.model.js";
-
+import Message from "../models/message.model.js";
 export const generateInterviewReportService = async (sessionId) => {
 
     const session = await InterviewSession.findById(sessionId)
@@ -18,7 +18,8 @@ export const generateInterviewReportService = async (sessionId) => {
 
     const topicScores = {}
 
-    session.messages.forEach(msg => {
+    const messages = await Message.find({sessionId})
+    messages.forEach(msg => {
         if(msg.role === "interviewer" && msg.topic && msg.score !== null){
             if(!topicScores[msg.topic]){
                 topicScores[msg.topic]=[]

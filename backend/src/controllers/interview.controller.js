@@ -35,7 +35,8 @@ export const checkAnswer = asyncHandler (async(req,res)=>{
 
 export const continueInterview = asyncHandler (async(req,res)=>{
     const {sessionId} = req.body
-    const result = await continueInterviewService(sessionId)
+    const io = req.app.get("io")
+    const result = await continueInterviewService(sessionId, io)
 
     if(result.interviewCompleted){
         return res.status(200).json({

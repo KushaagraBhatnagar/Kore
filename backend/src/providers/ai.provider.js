@@ -166,8 +166,28 @@ Return ONLY valid JSON:
             {role:'system',content:systemPrompt},
             ...conversation
         ],
-        temperature:0.2
+        temperature:0.2,
+        stream:true
     })
 
-    return response.choices[0].message.content?.trim() || ""
+    let completeJson = "";
+    let isStreamingQuestion = false;
+
+    for await (const chunk of response) {
+        const token = chunk.choices[0]?.delta?.content || "";
+        completeJson += token;
+        if (completeJson.includes('"nextQuestion":') && !completeJson.includes('"questionType":')) {
+            isStreamingQuestion = true;
+        } else if (completeJson.includes('"questionType":')) {
+            isStreamingQuestion = false;
+        }
+        if (isStreamingQuestion && token) {
+            const cleanToken = token.replace(/["\\]/g, ""); 
+            if (cleanToken && io && sessionId) {
+                io.to(sessionId).emit("ai_stream_chunk", { chunk: cleanToken });
+            }
+        }
+    }
+
+    return completeJson.trim();
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { io } from 'socket.io-client'
 import { generateQuestion, submitAnswer, continueInterview, reviewCode } from '../services/api'
 
 function Badge({ text, color }) {
@@ -24,10 +25,16 @@ function ScoreBar({ score }) {
 export default function Interview() {
   const { sessionId } = useParams()
   const navigate = useNavigate()
+  
+  // Refs
   const textareaRef = useRef(null)
+  const socketRef = useRef(null)
+  const lastWarningTime = useRef(0) 
 
+  // States
   const [phase, setPhase] = useState('loading')
   const [question, setQuestion] = useState(null)
+  const [streamedQuestion, setStreamedQuestion] = useState('')
   const [questionType, setQuestionType] = useState('concept')
   const [answer, setAnswer] = useState('')
   const [code, setCode] = useState('')
@@ -37,9 +44,78 @@ export default function Interview() {
   const [questionCount, setQuestionCount] = useState(0)
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [warnings, setWarnings] = useState(0)
+  const [showWarningBanner, setShowWarningBanner] = useState(false)
 
-  useEffect(() => { startInterview() }, [])
+  // Socket initialization
+  useEffect(() => {
+    socketRef.current = io("http://localhost:8000")
 
+    socketRef.current.on("connect", () => {
+      socketRef.current.emit("join_session", sessionId)
+    })
+
+    socketRef.current.on("ai_stream_chunk", (data) => {
+      setPhase((prev) => (prev === 'evaluating' ? 'typing' : prev))
+      setStreamedQuestion((prev) => prev + data.chunk)
+    })
+
+    startInterview()
+
+    return () => {
+      if (socketRef.current) socketRef.current.disconnect()
+    }
+  }, [sessionId])
+
+  // Anti-cheating logic (Tab switch detection)
+  useEffect(() => {
+    if (phase === 'done' || phase === 'loading') return;
+
+    const handleCheatingAttempt = () => {
+      const now = Date.now()
+      
+      // Throttle: ignore if triggered within 1 second of the last warning
+      if (now - lastWarningTime.current < 1000) return; 
+      lastWarningTime.current = now;
+
+      setWarnings((prev) => {
+        const newCount = prev + 1;
+
+        if (socketRef.current) {
+          socketRef.current.emit("proctor_alert", { sessionId, type: "tab_switch", count: newCount })
+        }
+
+        if (newCount >= 3) {
+          alert("You have been disqualified for switching tabs multiple times during the interview.")
+          setPhase('done');
+          setTimeout(() => navigate('/report/' + sessionId), 2000)
+        } else {
+          setShowWarningBanner(true);
+          setTimeout(() => setShowWarningBanner(false), 5000)
+        }
+        
+        return newCount;
+      })
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') handleCheatingAttempt()
+    }
+
+    const handleWindowBlur = () => {
+      handleCheatingAttempt();
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+    window.addEventListener("blur", handleWindowBlur)
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+      window.removeEventListener("blur", handleWindowBlur)
+    }
+  }, [phase, navigate, sessionId])
+
+  // API Calls
   const startInterview = async () => {
     setPhase('loading')
     setError(null)
@@ -86,6 +162,7 @@ export default function Interview() {
 
   const handleContinue = async () => {
     setPhase('evaluating')
+    setStreamedQuestion('')
     try {
       const res = await continueInterview(sessionId)
       if (res.interviewCompleted) {
@@ -96,6 +173,7 @@ export default function Interview() {
       setLastScore(res.score)
       setLastEvaluation(res.evaluation)
       setQuestion(res.nextQuestion)
+      setStreamedQuestion('')
       setQuestionType(res.questionType)
       setQuestionCount((c) => c + 1)
       setCode('')
@@ -108,6 +186,7 @@ export default function Interview() {
     }
   }
 
+  // Render logic
   if (phase === 'loading') {
     return (
       <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center gap-4">
@@ -135,13 +214,20 @@ export default function Interview() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white flex flex-col items-center px-4 py-10">
-
       <div className="w-full max-w-2xl flex items-center justify-between mb-8">
         <h1 className="text-xl font-bold text-blue-400">MockMate AI</h1>
         <span className="text-sm text-gray-500">Question {questionCount} / 10</span>
       </div>
 
-      {lastScore !== null && phase !== 'evaluating' && (
+      {/* Warning Banner */}
+      {showWarningBanner && (
+        <div className="w-full max-w-2xl bg-red-600 text-white font-bold px-4 py-3 rounded-xl mb-6 shadow-lg shadow-red-900/50 animate-bounce flex justify-between items-center">
+          <span>⚠️ Warning {warnings}/3: Tab switching is strictly prohibited!</span>
+        </div>
+      )}
+
+      {/* Score Banner */}
+      {lastScore !== null && phase !== 'evaluating' && phase !== 'typing' && (
         <div className="w-full max-w-2xl bg-gray-900 border border-gray-700 rounded-2xl p-4 mb-6">
           <div className="flex items-center justify-between mb-1">
             <span className="text-sm text-gray-400">Previous answer score</span>
@@ -154,15 +240,21 @@ export default function Interview() {
         </div>
       )}
 
+      {/* Question Card */}
       <div className="w-full max-w-2xl bg-gray-900 border border-gray-700 rounded-2xl p-6 mb-6">
         <div className="flex items-center gap-2 mb-4">
           <Badge text={questionType} color={questionType} />
           {phase === 'evaluating' && (
             <span className="text-xs text-gray-500 animate-pulse">AI is thinking...</span>
           )}
+          {phase === 'typing' && (
+            <span className="text-xs text-blue-400 animate-pulse">AI is typing...</span>
+          )}
         </div>
         <p className="text-gray-100 text-base leading-relaxed">
-          {phase === 'evaluating' ? '⏳ Evaluating your answer...' : question}
+          {phase === 'evaluating' && !streamedQuestion ? '⏳ Evaluating your answer...' : ''}
+          {phase === 'typing' ? streamedQuestion : ''}
+          {(phase === 'questioning' || phase === 'coding') ? question : ''}
         </p>
       </div>
 
@@ -172,6 +264,7 @@ export default function Interview() {
         </div>
       )}
 
+      {/* Concept Answer Input */}
       {phase === 'questioning' && (
         <div className="w-full max-w-2xl flex flex-col gap-3">
           <textarea
@@ -192,6 +285,7 @@ export default function Interview() {
         </div>
       )}
 
+      {/* Coding Answer Input */}
       {phase === 'coding' && (
         <div className="w-full max-w-2xl flex flex-col gap-3">
           <div className="flex gap-2">
@@ -221,14 +315,6 @@ export default function Interview() {
           </button>
         </div>
       )}
-
-      {phase === 'evaluating' && (
-        <div className="flex flex-col items-center gap-3 mt-4">
-          <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-gray-500 text-sm">AI is evaluating your answer...</p>
-        </div>
-      )}
-
     </div>
   )
 }

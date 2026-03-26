@@ -1,6 +1,6 @@
 import { reviewCodeWithAI } from "../providers/codeReview.provider.js";
 import InterviewSession from "../models/interviewSession.model.js";
-
+import Message from "../models/message.model.js";
 export const reviewCodeService = async (sessionId, code, language)=>{
     if(!sessionId || !code || !code.trim()){
         throw new Error("Session ID and code are required")
@@ -20,7 +20,8 @@ export const reviewCodeService = async (sessionId, code, language)=>{
         throw new Error("Current question is not a coding question")
     }
 
-    const lastQuestion = session.messages
+    const messages = await Message.find({sessionId}).sort({createdAt:1})
+    const lastQuestion = messages
         .filter(msg=>msg.role === "interviewer" && msg.type === "coding")
         .slice(-1)[0]
 
@@ -33,7 +34,8 @@ export const reviewCodeService = async (sessionId, code, language)=>{
     const review = await reviewCodeWithAI(question, code, language)
     const score = review.score || 0
 
-    session.messages.push({
+    await Message.create({
+        sessionId: session._id,
         role:"candidate",
         content:code,
         type:"coding",
@@ -41,7 +43,8 @@ export const reviewCodeService = async (sessionId, code, language)=>{
         score:score
     })
     
-    session.messages.push({
+    await Message.create({
+        sessionId: session._id,
         role:"interviewer",
         content:review.feedback,
         type:"coding",
