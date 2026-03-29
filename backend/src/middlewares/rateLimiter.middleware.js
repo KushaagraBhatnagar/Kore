@@ -1,5 +1,4 @@
 import rateLimit from "express-rate-limit";
-import { success } from "zod";
 
 export const aiRateLimiter = rateLimit({
     windowMs: 60*1000, // 1 minute

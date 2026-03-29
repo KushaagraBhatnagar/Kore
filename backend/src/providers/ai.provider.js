@@ -99,7 +99,7 @@ Example:
     return JSON.parse(jsonString)
 }
 
-export const continueInterviewWithAI = async (conversation, jobRole, difficultyLevel, topicsCovered = [], suggestedTopic) => {
+export const continueInterviewWithAI = async (conversation, jobRole, difficultyLevel, topicsCovered = [], suggestedTopic, io, sessionId) => {
     if(!process.env.OPENAI_API_KEY){
         throw new Error("OPENAI_API_KEY not found in environment variables")
     }
