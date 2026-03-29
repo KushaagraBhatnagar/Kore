@@ -6,6 +6,9 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server:{
     proxy:{// with this proxy baar baar http://localhost:8000 likhne ki zarurat nahi padegi, bas /api/endpoint likh dena hai
-      "/api": "http://localhost:8000"
+      "/api": {
+        "target": "http://localhost:8000",
+        "changeOrigin": true
+      }
   }
 }})

@@ -3,9 +3,10 @@ import createSession, { checkAnswer, generateQuestion, continueInterview } from 
 import { generateInterviewReport } from "../controllers/interview.analytics.controller.js"
 import { aiRateLimiter } from "../middlewares/rateLimiter.middleware.js"
 import { getSession } from "../controllers/session.controller.js"
+import { protect } from "../middlewares/auth.middleware.js"
 const router = express.Router()
 
-router.post("/create",createSession)
+router.post("/create",protect, createSession)
 router.post("/generate-question",aiRateLimiter,generateQuestion)
 router.post("/submit-answer",aiRateLimiter, checkAnswer);
 router.post("/continue-interview", aiRateLimiter, continueInterview);
