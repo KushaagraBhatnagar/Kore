@@ -11,16 +11,24 @@ const generateToken = (userId) => {
     );
 }
 
+const sendError = (res, statusCode, message) => {
+    return res.status(statusCode).json({
+        success: false,
+        message
+    })
+}
+
+
 export const register = asyncHandler(async (req,res) =>{
     const {name, email, password} = req.body
 
     if(!name || !email || !password){
-        return res.status(400).json({success:false, error:"Please provide name, email and password"})
+        return sendError(res, 400, "Please provide name, email and password")
     }
 
     const existingUser = await User.findOne({email})
     if(existingUser){
-        return res.status(400).json({success:false, error:"User with this email already exists"})
+        return sendError(res, 400, "User with this email already exists")
     }
 
     const user = await User.create({name,email,password})
@@ -28,6 +36,7 @@ export const register = asyncHandler(async (req,res) =>{
 
     res.status(201).json({
         success:true,
+        message:"User registered successfully",
         token,
         user:{
             id:user._id,
@@ -40,29 +49,24 @@ export const register = asyncHandler(async (req,res) =>{
 export const login = asyncHandler(async (req,res) =>{
     const {email, password} = req.body
     if(!email || !password){
-        return res.status(400).json({success:false, error:"Please provide email and password"})
+        return sendError(res, 400, "Please provide email and password")
     }
 
     const user = await User.findOne({email})
     if(!user){
-        return res.status(401).json({
-            success:false,
-            message:"Invalid email or password"
-        })
+        return sendError(res, 401, "Invalid email or password")
     }
 
     const isMatch = await user.comparePassword(password)
     if(!isMatch){
-        return res.status(401).json({
-            success:false,
-            message:"Invalid email or password"
-        })
+        return sendError(res, 401, "Invalid email or password")
     }
 
     const token = generateToken(user._id)
 
     res.status(200).json({
         success:true,
+        message:"Login successful",
         token,
         user:{
             id:user._id,
@@ -74,8 +78,9 @@ export const login = asyncHandler(async (req,res) =>{
 })
 
 export const getMe = asyncHandler(async (req,res) =>{
-    res.status(200).json({
+    return res.status(200).json({
         success:true,
+        message:"User data retrieved successfully",
         user:{
             id:req.user._id,
             name:req.user.name,
