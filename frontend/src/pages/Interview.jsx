@@ -5,6 +5,7 @@ import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision'
 import * as tf from '@tensorflow/tfjs'
 import * as cocoSsd from '@tensorflow-models/coco-ssd'
 import { generateQuestion, submitAnswer, continueInterview, reviewCode } from '../services/api'
+import Editor from '@monaco-editor/react'
 
 function Badge({ text, color }) {
   let cls = 'text-xs font-semibold px-3 py-1 rounded-full bg-blue-900/50 text-blue-300 border border-blue-800'
@@ -256,7 +257,7 @@ export default function Interview() {
       if (faceLandmarker) faceLandmarker.close();
       if (stream) stream.getTracks().forEach(track => track.stop());
     };
-  }, []); // 🚀 THE BRAMHASTRA: Empty array ensures models load ONLY ONCE
+  }, []); 
 
   const startInterview = async () => {
     setPhase('loading')
@@ -434,34 +435,75 @@ export default function Interview() {
             </div>
           )}
 
-          {phase === 'coding' && (
-            <div className="w-full flex flex-col gap-3">
-              <div className="flex gap-2">
-                {['javascript', 'python', 'java', 'cpp'].map((lang) => {
-                  const isActive = language === lang
-                  return (
-                    <button 
-                      key={lang} 
-                      onClick={() => setLanguage(lang)} 
-                      className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${isActive ? 'bg-yellow-600 text-black' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
-                    >
-                      {lang.toUpperCase()}
-                    </button>
-                  )
-                })}
-              </div>
-              <textarea
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                placeholder="// Write your optimized solution here..."
-                rows={14}
-                className="w-full bg-[#1e1e1e] border border-gray-700 rounded-2xl p-4 text-green-400 placeholder-gray-600 focus:outline-none focus:border-yellow-500 resize-none text-sm font-mono shadow-inner"
-              />
-              <button onClick={handleSubmitCode} disabled={!code.trim() || loading} className={codeBtnClass}>
-                {loading ? 'Reviewing code...' : 'Submit Code'}
-              </button>
+        {phase === 'coding' && (
+          <div className="w-full flex flex-col gap-3">
+
+            {/* Language selector */}
+            <div className="flex gap-2">
+              {['javascript', 'python', 'java', 'cpp'].map((lang) => {
+                const isActive = language === lang
+                return (
+                  <button
+                    key={lang}
+                    onClick={() => setLanguage(lang)}
+                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${isActive ? 'bg-yellow-600 text-black' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
+                  >
+                    {lang.toUpperCase()}
+                  </button>
+                )
+              })}
             </div>
-          )}
+
+            {/* Copy-paste warning banner */}
+            <div className="flex items-center gap-2 bg-yellow-950/30 border border-yellow-900/50 rounded-xl px-4 py-2">
+              <span className="text-yellow-500 text-xs">⚠️</span>
+              <p className="text-yellow-400 text-xs font-medium">
+                Copy-paste is disabled. Write your solution from scratch.
+              </p>
+            </div>
+
+            {/* Monaco Editor */}
+            <div
+              className="rounded-2xl overflow-hidden border border-gray-700 shadow-inner"
+              onPaste={(e) => {
+                e.preventDefault()
+                triggerCheatWarning("paste_detected", "Copy-paste is not allowed in coding section!")
+              }}
+              onCopy={(e) => e.preventDefault()}
+              onCut={(e) => e.preventDefault()}
+              onContextMenu={(e) => e.preventDefault()}
+            >
+              <Editor
+                height="320px"
+                language={language === 'cpp' ? 'cpp' : language}
+                value={code}
+                onChange={(val) => setCode(val || '')}
+                theme="vs-dark"
+                options={{
+                  minimap: { enabled: false },
+                  contextmenu: false,
+                  fontSize: 14,
+                  fontFamily: 'JetBrains Mono, Fira Code, monospace',
+                  lineNumbers: 'on',
+                  scrollBeyondLastLine: false,
+                  automaticLayout: true,
+                  tabSize: 2,
+                  wordWrap: 'on',
+                  padding: { top: 16, bottom: 16 }
+                }}
+              />
+            </div>
+
+            <button
+              onClick={handleSubmitCode}
+              disabled={!code.trim() || loading}
+              className={codeBtnClass}
+            >
+              {loading ? 'Reviewing code...' : 'Submit Code'}
+            </button>
+
+          </div>
+        )}
         </div>
 
         <div className="w-full lg:w-80 flex flex-col gap-6">
