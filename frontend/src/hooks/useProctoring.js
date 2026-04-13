@@ -102,7 +102,106 @@ export function useProctoring({sessionId, phase, navigate, socketRef}){
             }
         }
 
-        
+        let lastVideoTime = -1
 
-    })
+        const runDetectionLoop = async () =>{
+            if(!isRunning) return
+            if(!videoRef.current || !faceLandmarker){
+                animationFrameId = requestAnimationFrame(runDetectionLoop)
+                return
+            }
+
+            if(videoRef.current.currentTime !== lastVideoTime){
+                lastVideoTime = videoRef.current.currentTime
+                frameCounter.current +=1
+                
+                // face detection
+                const results = faceLandmarker.detectForVideo(videoRef.current, performance.now())
+                const faceCount = results.faceLandmarks?.length ?? 0
+
+                if(faceCount !== 1){
+                    handleFaceViolation(faceCount)
+                } else{
+                    faceViolationFrames.current = 0
+                    handleGazeCheck(results)
+                }
+
+                //object detection
+                if(frameCounter.current % OBJECT_DETECT_EVERY === 0 && objectDetectorRef.current){
+                    const preds = await objectDetectorRef.current.detect(videoRef.current)
+                    const forbidden = preds.find(p => FORBIDDEN_OBJECTS.has(p.class) && p.score > 0.35)
+                    if(forbidden){
+                        triggerCheatWarning('object_detected', `Forbidden object detected : Mobile Device`)
+                    }
+                }
+            }
+            animationFrameId = requestAnimationFrame(runDetectionLoop)
+        }
+
+        const handleFaceViolation = (faceCount) => {
+            faceViolationFrames.current += 1
+            if(faceViolationFrames.current > FACE_VIOLATION_FRAMES){
+                triggerCheatWarning(
+                    faceCount === 0 ? 'no_face' : 'multiple_faces',
+                    faceCount === 0 ? 'No face detected. Please ensure your face is visible to the camera.' : 'Multiple faces detected. Please ensure you are alone during the interview.'
+                )
+                faceViolationFrames.current = 0
+            }
+        }
+        
+        const handleGazeCheck = (results) => {
+            const landmarks = results.faceLandmarks[0]
+            const topOfHead = landmarks[10]
+            const nose = landmarks[1]
+            const chin = landmarks[152]
+            const headTiltRatio = Math.abs(nose.y-topOfHead.y)/Math.abs(chin.y-nose.y)
+
+            let isLookingSides = false
+            let isLookingUp = false
+
+            if(results.faceBlendshapes?.length > 0){
+                const bs = results.faceBlendshapes[0].categories
+                const get = (name) => bs.find(b=> b.categoryName === name)?.score ?? 0
+
+                isLookingSides = (get('eyeLookOutLeft') > LOOK_AWAY_THRESHOLD && get('eyeLookInRight')> LOOK_AWAY_THRESHOLD) ||
+                                (get('eyeLookInLeft') > LOOK_AWAY_THRESHOLD && get('eyeLookOutRight')> LOOK_AWAY_THRESHOLD)
+
+                isLookingUp = get('eyeLookUpLeft') > LOOK_AWAY_THRESHOLD && get('eyeLookUpRight') > LOOK_AWAY_THRESHOLD
+            }
+
+            const isTiltedAway = headTiltRatio > 1.85 || headTiltRatio < 0.55
+
+            if(isLookingSides || isLookingUp || isTiltedAway){
+                lookAwayFrames.current += 1
+                setProctorMsg('👀 Please keep your eyes on the screen during the interview.')
+                if(lookAwayFrames.current > LOOK_AWAY_FRAMES){
+                    triggerCheatWarning('eye_tracking_violation', 'Please look directly at the screen!')
+                    lookAwayFrames.current = 0
+                }
+            } else{
+                lookAwayFrames.current = 0
+                setProctorMsg('Proctoring Active')
+            }
+        }
+
+        init()
+
+        return () => {
+            isRunning = false
+            if(animationFrameId){
+                cancelAnimationFrame(animationFrameId)
+            }
+            faceLandmarker?.close()
+            stream?.getTracks().forEach(t=>t.stop())
+        }  
+    }, [])
+
+    return {
+        warnings,
+        showWarningBanner,
+        warningMessage,
+        proctorMsg,
+        videoRef,
+        triggerCheatWarning,
+    }
 }
