@@ -35,8 +35,8 @@ export default function CodeEditorPanel({
             onClick={() => onLanguageChange(lang)}
             className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
               language === lang
-                ? 'bg-yellow-600 text-black'
-                : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                ? 'bg-blue-600 text-white'
+                : 'bg-sky-50 border border-sky-200 text-slate-600 hover:bg-sky-100'
             }`}
           >
             {lang.toUpperCase()}
@@ -45,16 +45,16 @@ export default function CodeEditorPanel({
       </div>
 
       {/* Paste warning */}
-      <div className="flex items-center gap-2 bg-yellow-950/30 border border-yellow-900/50 rounded-xl px-4 py-2">
-        <span className="text-yellow-500 text-xs">⚠️</span>
-        <p className="text-yellow-400 text-xs font-medium">
+      <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2">
+        <span className="text-amber-700 text-xs font-semibold bg-amber-100 px-2 py-0.5 rounded-full">NOTICE</span>
+        <p className="text-amber-700 text-xs font-medium">
           Copy-paste is disabled. Write your solution from scratch.
         </p>
       </div>
 
       {/* Editor wrapper — intercepts clipboard events */}
       <div
-        className="rounded-2xl overflow-hidden border border-gray-700 shadow-inner"
+        className="rounded-2xl overflow-hidden border border-sky-200"
         onPaste={(e)       => { e.preventDefault(); onPasteViolation() }}
         onCopy={(e)        => e.preventDefault()}
         onCut={(e)         => e.preventDefault()}
@@ -65,7 +65,7 @@ export default function CodeEditorPanel({
           language={language}
           value={code}
           onChange={(val) => onCodeChange(val ?? '')}
-          theme="vs-dark"
+          theme="vs-light"
           options={EDITOR_OPTIONS}
         />
       </div>
@@ -76,8 +76,8 @@ export default function CodeEditorPanel({
         disabled={!code.trim() || loading}
         className={`w-full py-3 rounded-xl font-semibold text-base transition-all ${
           code.trim() && !loading
-            ? 'bg-yellow-600 hover:bg-yellow-500 text-white shadow-lg shadow-yellow-900/20 cursor-pointer'
-            : 'bg-gray-800 text-gray-500 cursor-not-allowed'
+            ? 'bg-blue-600 hover:bg-blue-700 text-white cursor-pointer'
+            : 'bg-sky-100 text-sky-500 cursor-not-allowed'
         }`}
       >
         {loading ? 'Reviewing code...' : 'Submit Code'}

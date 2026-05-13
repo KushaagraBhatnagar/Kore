@@ -3,12 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { createSession } from '../services/api'
 
 const JOB_ROLES = [
-  { id: 'frontend developer',   label: 'Frontend Developer',   icon: '🖥️' },
-  { id: 'backend developer',    label: 'Backend Developer',    icon: '⚙️' },
-  { id: 'full stack developer', label: 'Full Stack Developer', icon: '🔗' },
-  { id: 'devops engineer',      label: 'DevOps Engineer',      icon: '🚀' },
-  { id: 'data scientist',       label: 'Data Scientist',       icon: '📊' },
-  { id: 'ai engineer',          label: 'AI Engineer',          icon: '🤖' },
+  { id: 'frontend developer',   label: 'Frontend Developer',   icon: 'FE' },
+  { id: 'backend developer',    label: 'Backend Developer',    icon: 'BE' },
+  { id: 'full stack developer', label: 'Full Stack Developer', icon: 'FS' },
+  { id: 'devops engineer',      label: 'DevOps Engineer',      icon: 'DEV' },
+  { id: 'data scientist',       label: 'Data Scientist',       icon: 'DS' },
+  { id: 'ai engineer',          label: 'AI Engineer',          icon: 'AI' },
 ]
 
 export default function Home() {
@@ -40,14 +40,14 @@ export default function Home() {
   }
 
   return (
-    <div className="relative min-h-screen bg-gray-950 text-white flex flex-col items-center justify-center px-4">
+    <div className="relative min-h-screen bg-slate-50 text-slate-900 flex flex-col items-center justify-center px-4">
 
       {/* Top right — user info + logout */}
       <div className="absolute top-4 right-4 flex items-center gap-3">
-        <span className="text-gray-500 text-sm">👋 {user.name}</span>
+        <span className="text-slate-600 text-sm">Hi, {user.name}</span>
         <button
           onClick={handleLogout}
-          className="text-xs text-gray-600 hover:text-gray-400 transition-all cursor-pointer border border-gray-800 px-3 py-1.5 rounded-lg"
+          className="text-xs text-slate-700 hover:text-slate-900 transition-all cursor-pointer border border-slate-300 px-3 py-1.5 rounded-lg hover:bg-slate-100"
         >
           Logout
         </button>
@@ -55,10 +55,10 @@ export default function Home() {
 
       {/* Header */}
       <div className="text-center mb-12">
-        <h1 className="text-5xl font-bold mb-3 text-blue-400">
-          MockMate AI
+        <h1 className="text-5xl font-bold mb-3 text-blue-700">
+          Kore
         </h1>
-        <p className="text-gray-400 text-lg">
+        <p className="text-slate-600 text-lg">
           A FAANG-level mock interview powered by AI
         </p>
       </div>
@@ -68,16 +68,16 @@ export default function Home() {
         {JOB_ROLES.map((role) => {
           const isSelected = selectedRole === role.id
           const cardClass = isSelected
-            ? 'flex flex-col items-center gap-2 p-5 rounded-2xl border-2 transition-all duration-200 cursor-pointer w-full border-blue-500 bg-blue-900 scale-105'
-            : 'flex flex-col items-center gap-2 p-5 rounded-2xl border-2 transition-all duration-200 cursor-pointer w-full border-gray-700 bg-gray-900 hover:border-gray-500'
+            ? 'flex flex-col items-center gap-2 p-5 rounded-2xl border-2 transition-all duration-200 cursor-pointer w-full border-blue-500 bg-blue-50 scale-105'
+            : 'flex flex-col items-center gap-2 p-5 rounded-2xl border-2 transition-all duration-200 cursor-pointer w-full border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50'
           return (
             <button
               key={role.id}
               onClick={() => setSelectedRole(role.id)}
               className={cardClass}
             >
-              <span className="text-3xl">{role.icon}</span>
-              <span className="text-sm font-medium text-center">{role.label}</span>
+              <span className="text-xs font-semibold text-blue-700 bg-blue-100 px-2.5 py-1 rounded-full">{role.icon}</span>
+              <span className="text-sm font-medium text-center text-slate-800">{role.label}</span>
             </button>
           )
         })}
@@ -85,7 +85,7 @@ export default function Home() {
 
       {/* Error */}
       {error && (
-        <p className="text-red-400 mb-4 text-sm">{error}</p>
+        <p className="text-red-600 mb-4 text-sm">{error}</p>
       )}
 
       {/* Start Button */}
@@ -93,14 +93,14 @@ export default function Home() {
         onClick={handleStart}
         disabled={!selectedRole || loading}
         className={selectedRole && !loading
-          ? 'px-10 py-4 rounded-2xl text-lg font-semibold bg-blue-600 hover:bg-blue-500 cursor-pointer text-white transition-all'
-          : 'px-10 py-4 rounded-2xl text-lg font-semibold bg-gray-700 text-gray-500 cursor-not-allowed'}
+          ? 'px-10 py-4 rounded-2xl text-lg font-semibold bg-blue-600 hover:bg-blue-700 cursor-pointer text-white transition-all'
+          : 'px-10 py-4 rounded-2xl text-lg font-semibold bg-slate-200 text-slate-400 cursor-not-allowed'}
       >
-        {loading ? 'Starting...' : 'Start Interview →'}
+        {loading ? 'Starting...' : 'Start Interview'}
       </button>
 
-      <p className="mt-8 text-gray-600 text-sm">
-        10 questions · up to 20 minutes · instant feedback
+      <p className="mt-8 text-slate-500 text-sm">
+        10 questions - up to 20 minutes - instant feedback
       </p>
 
     </div>

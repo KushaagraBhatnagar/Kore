@@ -7,8 +7,11 @@ export function useVoice(questionType){
 
     const answerRef = useRef('') // stores latest answer safely for async callbacks
     const recognitionRef = useRef(null) // stores SpeechRecognition instance
-    const silenceTimerRef = useRef(null) // timer to detect silence
+    const restartTimerRef = useRef(null) // timer to restart recognition safely
+    const isListeningRef = useRef(false)
     const questionTypeRef = useRef(questionType) // stores latest question type safely
+    const finalTranscriptRef = useRef('')
+    const interimTranscriptRef = useRef('')
 
     useEffect(()=>{
         questionTypeRef.current = questionType
@@ -20,8 +23,8 @@ export function useVoice(questionType){
         return ()=>{
             window.speechSynthesis.cancel()
             recognitionRef.current?.stop()
-            if(silenceTimerRef.current){
-                clearTimeout(silenceTimerRef.current)
+            if(restartTimerRef.current){
+                clearTimeout(restartTimerRef.current)
             }
         }
     },[])
@@ -47,7 +50,7 @@ export function useVoice(questionType){
 
                 utterance.onend = () => {
                     setIsSpeaking(false)
-                    if(questionTypeRef.current === 'coding'){
+                    if(questionTypeRef.current !== 'coding'){
                         startListening()
                     }
                 }
@@ -71,10 +74,13 @@ export function useVoice(questionType){
         if(!SpeechRecognition) return
 
         setAnswer('')
-        answerRef.current=''
+        answerRef.current = ''
+        finalTranscriptRef.current = ''
+        interimTranscriptRef.current = ''
+        isListeningRef.current = true
 
         const recognition = new SpeechRecognition()
-        recognition.current = recognition
+        recognitionRef.current = recognition
         recognition.continuous = true
         recognition.interimResults = true
         recognition.lang = 'en-US'
@@ -82,41 +88,61 @@ export function useVoice(questionType){
         recognition.onstart = () => setIsListening(true)
 
         recognition.onresult = (e) => {
-            const transcript = Array.from(e.results).map(r=> r[0].transcript).join('')
-            setAnswer(transcript)
-            answerRef.current = transcript
-            
-            //pehle se timer chlra toh bnd krdo
-            if(silenceTimerRef.current){
-                clearTimeout(silenceTimerRef.current)
+            let interim = ''
+            for(let i = e.resultIndex; i < e.results.length; i++){
+                const result = e.results[i]
+                if(result.isFinal){
+                    finalTranscriptRef.current += result[0].transcript
+                } else {
+                    interim += result[0].transcript
+                }
             }
 
-            //naya timer chalaya
-            silenceTimerRef.current = setTimeout(()=> recognition.stop(),2500)
+            interimTranscriptRef.current = interim
+            const transcript = `${finalTranscriptRef.current}${interimTranscriptRef.current}`
+            setAnswer(transcript)
+            answerRef.current = transcript
         }
 
         recognition.onend = () => {
+            if(restartTimerRef.current) clearTimeout(restartTimerRef.current)
+            if(isListeningRef.current){
+                restartTimerRef.current = setTimeout(() => {
+                    recognitionRef.current?.start()
+                }, 200)
+                return
+            }
             setIsListening(false)
-            if(silenceTimerRef.current) clearTimeout(silenceTimerRef.current)
         }
-        recognition.onerror = () => setIsListening(false)
+        recognition.onerror = (event) => {
+            if(event?.error === 'no-speech' && isListeningRef.current){
+                return
+            }
+            if(event?.error === 'not-allowed' || event?.error === 'service-not-allowed'){
+                isListeningRef.current = false
+                setIsListening(false)
+            }
+        }
 
         recognition.start()
     }
 
     const stopListening = () => {
+        isListeningRef.current = false
         recognitionRef.current?.stop()
-        if(silenceTimerRef.current) clearTimeout(silenceTimerRef.current)
-            setIsListening(false)
+        if(restartTimerRef.current) clearTimeout(restartTimerRef.current)
+        setIsListening(false)
     }
 
     const reRecord = () => {
         setAnswer('')
         answerRef.current = ''
+        finalTranscriptRef.current = ''
+        interimTranscriptRef.current = ''
         startListening()
     }
 
-    const voiceSupported = !!(window.speechSynthesis || window.webkitSpeechRecognition)
+    const voiceSupported = !!(window.SpeechRecognition || window.webkitSpeechRecognition)
 
     return {
         isSpeaking,
